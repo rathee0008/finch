@@ -1,21 +1,20 @@
 {
-  "name": "finance-app",
+  "name": "finch",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "GITHUB_PAGES=true npm run build && touch dist/.nojekyll && cd dist && rm -rf .git && git init -q -b gh-pages && git add -A && git commit -q -m \"Deploy Finch to GitHub Pages\" && git push -f https://github.com/rathee0008/finch.git gh-pages && rm -rf .git"
   },
   "dependencies": {
-    "date-fns": "^4.4.0",
     "lucide-react": "^1.33.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "recharts": "^3.10.1",
-    "uuid": "^14.0.2"
+    "recharts": "^3.10.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",

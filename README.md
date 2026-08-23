@@ -4,6 +4,10 @@ A local-first personal finance manager. Accounts, budgets, cash-flow forecasting
 
 No account, no server, no telemetry. Nothing is ever uploaded anywhere.
 
+**→ [Try it live](https://rathee0008.github.io/finch/)**
+
+The live demo loads a sample dataset so you can explore every screen. Anything you change is saved to your own browser only — it isn't sent anywhere, and it isn't visible to anyone else.
+
 ![License](https://img.shields.io/badge/license-MIT-blue) ![React](https://img.shields.io/badge/React-19-149eca) ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6) ![Vite](https://img.shields.io/badge/Vite-8-646cff)
 
 ---
@@ -68,6 +72,20 @@ The app starts with a realistic sample dataset so every screen is immediately us
 | `npm run dev` | Start the dev server |
 | `npm run build` | Type-check and build for production |
 | `npm run preview` | Serve the production build locally |
+
+### Deploying
+
+The live site is served from the `gh-pages` branch. To publish an update:
+
+```bash
+npm run deploy
+```
+
+That builds with the `/finch/` asset base path and force-pushes `dist/`
+to `gh-pages`, which GitHub Pages serves.
+
+Hosting anywhere else (Vercel, Netlify, any static host) needs no special
+flags — a plain `npm run build` outputs a root-relative site to `dist/`.
 
 ---
 
