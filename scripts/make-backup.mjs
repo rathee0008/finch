@@ -29,6 +29,23 @@ const ACCOUNTS = [
     institution: 'HDFC Bank',
     color: '#4f46e5',
   },
+  {
+    // Current value of 26 HDFC Bank + 50 ITC shares, per the Groww app.
+    name: 'Groww Stocks',
+    type: 'investment',
+    balance: 32439.0,
+    institution: 'Groww',
+    color: '#0891b2',
+  },
+  {
+    // Current value of all 6 SIP/mutual fund holdings (only 3 were visible
+    // in the screenshot, but the ₹34,599 total already covers all 6).
+    name: 'Groww Mutual Funds',
+    type: 'investment',
+    balance: 34599.0,
+    institution: 'Groww',
+    color: '#2563eb',
+  },
 ];
 
 // --- Real transactions (none yet) ---------------------------------------
