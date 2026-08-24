@@ -18,13 +18,35 @@ export function parseISODate(iso: string): Date {
   return new Date(y, (m ?? 1) - 1, d ?? 1);
 }
 
+/**
+ * Digit grouping is a property of the locale, not the symbol. Rendering INR
+ * with en-US gives ₹1,000,000 where an Indian reader expects the lakh/crore
+ * grouping ₹10,00,000, so each currency picks the locale that groups it the
+ * way its readers actually write numbers.
+ */
+const LOCALE_BY_CURRENCY: Record<string, string> = {
+  INR: 'en-IN',
+  GBP: 'en-GB',
+  EUR: 'de-DE',
+  JPY: 'ja-JP',
+  CHF: 'de-CH',
+  CAD: 'en-CA',
+  AUD: 'en-AU',
+  SGD: 'en-SG',
+  AED: 'en-AE',
+};
+
+function localeFor(currency: string): string {
+  return LOCALE_BY_CURRENCY[currency] ?? 'en-US';
+}
+
 export function formatCurrency(amount: number, currency = 'USD'): string {
   const sign = amount < 0 ? '-' : '';
   const abs = Math.abs(amount);
   try {
     return (
       sign +
-      new Intl.NumberFormat('en-US', {
+      new Intl.NumberFormat(localeFor(currency), {
         style: 'currency',
         currency,
         currencyDisplay: 'narrowSymbol',
@@ -42,7 +64,7 @@ export function formatCompact(amount: number, currency = 'USD'): string {
   try {
     return (
       sign +
-      new Intl.NumberFormat('en-US', {
+      new Intl.NumberFormat(localeFor(currency), {
         style: 'currency',
         currency,
         currencyDisplay: 'narrowSymbol',
