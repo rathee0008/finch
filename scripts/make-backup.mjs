@@ -46,6 +46,13 @@ const ACCOUNTS = [
     institution: 'Groww',
     color: '#2563eb',
   },
+  {
+    // Current value of the fractional US stock portfolio (Alphabet, TSM, etc).
+    name: 'US Stocks',
+    type: 'investment',
+    balance: 84252.93,
+    color: '#f59e0b',
+  },
 ];
 
 // --- Real transactions (none yet) ---------------------------------------
