@@ -1,10 +1,13 @@
-import { useRef } from 'react';
-import { Download, Upload, RotateCcw, Trash2, Check } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Download, Upload, RotateCcw, Trash2, Check, History, Undo2 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { useToast } from '../context/ToastContext';
 import { exportFullBackup, transactionsToCSV, downloadCSV } from '../lib/csv';
 import { ACCENT_PRESETS, CURRENCIES } from '../lib/defaults';
-import { Button, Field, Select, Segmented } from './ui/Field';
+import { listSnapshots, REASON_LABELS } from '../lib/snapshots';
+import { formatCurrency } from '../lib/format';
+import { Modal } from './ui/Modal';
+import { Button, Field, Select, Segmented, TextInput, Badge } from './ui/Field';
 import type { Density } from '../types';
 
 function Section({
@@ -33,11 +36,18 @@ function Section({
 }
 
 export function SettingsPage() {
-  const { state, updateSettings, resetToSample, wipeAll, importState } = useFinance();
+  const { state, updateSettings, resetToSample, wipeAll, importState, restoreSnapshot } =
+    useFinance();
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const [restoreOpen, setRestoreOpen] = useState(false);
+  const [wipeOpen, setWipeOpen] = useState(false);
+  const [wipeConfirm, setWipeConfirm] = useState('');
+
   const { settings } = state;
+  // Re-read on each render so the list reflects snapshots taken since mount.
+  const snapshots = listSnapshots();
 
   const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -192,15 +202,34 @@ export function SettingsPage() {
         </div>
       </Section>
 
-      <Section title="Danger zone" description="These actions cannot be undone from here.">
+      <Section
+        title="Local backups"
+        description="Finch snapshots your data automatically as you work, and always right before anything destructive. Restore any point below."
+      >
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+            {snapshots.length === 0
+              ? 'No snapshots yet — one is taken a few seconds after your next change.'
+              : `${snapshots.length} snapshot${snapshots.length === 1 ? '' : 's'} available, newest ${new Date(
+                  snapshots[0].takenAt
+                ).toLocaleString()}`}
+          </div>
+          <Button variant="secondary" onClick={() => setRestoreOpen(true)} disabled={snapshots.length === 0}>
+            <History size={15} /> Browse & restore
+          </Button>
+        </div>
+      </Section>
+
+      <Section title="Danger zone" description="Each of these takes a snapshot first, so it can be undone from Local backups.">
         <div className="flex flex-wrap gap-2">
           <Button
             variant="secondary"
             onClick={() => {
-              if (confirm('Replace all current data with the sample dataset?')) {
-                resetToSample();
-                toast('Sample data loaded');
-              }
+              resetToSample();
+              toast('Sample data loaded — a snapshot of your old data was saved', {
+                tone: 'info',
+                duration: 6000,
+              });
             }}
           >
             <RotateCcw size={15} /> Load sample data
@@ -208,16 +237,101 @@ export function SettingsPage() {
           <Button
             variant="danger"
             onClick={() => {
-              if (confirm('Permanently delete every account, transaction and budget?')) {
-                wipeAll();
-                toast('All data deleted', { tone: 'warning' });
-              }
+              setWipeConfirm('');
+              setWipeOpen(true);
             }}
           >
             <Trash2 size={15} /> Delete everything
           </Button>
         </div>
       </Section>
+
+      <Modal
+        open={restoreOpen}
+        onClose={() => setRestoreOpen(false)}
+        title="Restore a snapshot"
+        subtitle="Restoring also snapshots your current data first, so this is reversible."
+        width={560}
+      >
+        <div className="space-y-2">
+          {snapshots.map((s) => (
+            <div
+              key={s.id}
+              className="flex items-center justify-between gap-3 flex-wrap p-3 rounded-lg"
+              style={{ background: 'var(--color-surface-2)' }}
+            >
+              <div className="min-w-0">
+                <div
+                  className="text-[13px] font-medium flex items-center gap-2 flex-wrap"
+                  style={{ color: 'var(--color-text)' }}
+                >
+                  {new Date(s.takenAt).toLocaleString()}
+                  {s.reason !== 'auto' && <Badge tone="warning">{REASON_LABELS[s.reason]}</Badge>}
+                </div>
+                <div className="text-[11px] tnum" style={{ color: 'var(--color-text-muted)' }}>
+                  {s.accounts} accounts · {s.transactions} transactions ·{' '}
+                  {formatCurrency(s.netWorth, settings.currency)}
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  if (restoreSnapshot(s.id)) {
+                    toast('Snapshot restored');
+                    setRestoreOpen(false);
+                  } else {
+                    toast('That snapshot could not be read', { tone: 'error' });
+                  }
+                }}
+              >
+                <Undo2 size={13} /> Restore
+              </Button>
+            </div>
+          ))}
+        </div>
+      </Modal>
+
+      <Modal
+        open={wipeOpen}
+        onClose={() => setWipeOpen(false)}
+        title="Delete everything?"
+        subtitle="A snapshot is saved first, so you can undo this from Local backups."
+        width={420}
+        footer={
+          <>
+            <div className="flex-1" />
+            <Button variant="secondary" onClick={() => setWipeOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              disabled={wipeConfirm.trim().toUpperCase() !== 'DELETE'}
+              onClick={() => {
+                wipeAll();
+                setWipeOpen(false);
+                toast('All data deleted — restore it from Local backups', {
+                  tone: 'warning',
+                  duration: 8000,
+                });
+              }}
+            >
+              <Trash2 size={15} /> Delete everything
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm mb-4" style={{ color: 'var(--color-text-muted)' }}>
+          This removes all {state.accounts.length} accounts and {state.transactions.length}{' '}
+          transactions. Type <strong style={{ color: 'var(--color-text)' }}>DELETE</strong> to confirm.
+        </p>
+        <TextInput
+          value={wipeConfirm}
+          onChange={(e) => setWipeConfirm(e.target.value)}
+          placeholder="DELETE"
+          autoFocus
+        />
+      </Modal>
 
       <p className="text-xs text-center pb-4" style={{ color: 'var(--color-text-subtle)' }}>
         Finch · local-first personal finance · press <kbd>?</kbd> for keyboard shortcuts

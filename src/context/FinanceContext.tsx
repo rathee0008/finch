@@ -15,6 +15,7 @@ import { uid } from '../lib/id';
 import { buildSampleState } from '../lib/sampleData';
 import { toLocalISODate, addMonths, currentMonth } from '../lib/format';
 import { applyRules } from '../lib/rules';
+import { pushSnapshot, getSnapshotState, type SnapshotReason } from '../lib/snapshots';
 
 const HISTORY_LIMIT = 60;
 
@@ -73,6 +74,7 @@ interface FinanceContextValue {
   resetToSample: () => void;
   wipeAll: () => void;
   importState: (s: FinanceState) => void;
+  restoreSnapshot: (id: string) => boolean;
 }
 
 const FinanceContext = createContext<FinanceContextValue | null>(null);
@@ -121,6 +123,25 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     saveState(state);
   }, [state]);
+
+  // Snapshot on a trailing debounce so a burst of edits costs one entry, not
+  // twenty, while a single change still gets recorded a few seconds later.
+  useEffect(() => {
+    const timer = window.setTimeout(() => pushSnapshot(state, 'auto'), 4000);
+    return () => window.clearTimeout(timer);
+  }, [state]);
+
+  /**
+   * Takes an immediate snapshot before an action that destroys data.
+   * Deliberately not inside a setState updater — those are re-invoked under
+   * StrictMode, which would record the snapshot twice.
+   */
+  const snapshotNow = useCallback(
+    (reason: SnapshotReason) => {
+      pushSnapshot(state, reason);
+    },
+    [state]
+  );
 
   /** Applies a state change and records it on the undo stack. */
   const commit = useCallback((updater: (s: FinanceState) => FinanceState) => {
@@ -489,11 +510,34 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     [commitQuiet]
   );
 
-  const resetToSample = useCallback(() => commit(() => buildSampleState()), [commit]);
-  const wipeAll = useCallback(() => commit(() => emptyState()), [commit]);
+  const resetToSample = useCallback(() => {
+    snapshotNow('before-sample-reset');
+    commit(() => buildSampleState());
+  }, [commit, snapshotNow]);
+
+  const wipeAll = useCallback(() => {
+    snapshotNow('before-wipe');
+    commit(() => emptyState());
+  }, [commit, snapshotNow]);
+
   const importState = useCallback(
-    (s: FinanceState) => commit(() => normalizeState(s)),
-    [commit]
+    (s: FinanceState) => {
+      snapshotNow('before-import');
+      commit(() => normalizeState(s));
+    },
+    [commit, snapshotNow]
+  );
+
+  const restoreSnapshot = useCallback(
+    (id: string): boolean => {
+      const restored = getSnapshotState(id);
+      if (!restored) return false;
+      // Snapshot the current state too, so restoring is itself reversible.
+      snapshotNow('before-restore');
+      commit(() => normalizeState(restored));
+      return true;
+    },
+    [commit, snapshotNow]
   );
 
   const value = useMemo<FinanceContextValue>(
@@ -537,6 +581,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       resetToSample,
       wipeAll,
       importState,
+      restoreSnapshot,
     }),
     [
       state,
@@ -578,6 +623,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       resetToSample,
       wipeAll,
       importState,
+      restoreSnapshot,
     ]
   );
 
