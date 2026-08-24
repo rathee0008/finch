@@ -60,6 +60,13 @@ const ACCOUNTS = [
     institution: 'HDFC Bank',
     color: '#db2777',
   },
+  {
+    name: 'Asha HDFC',
+    type: 'savings',
+    balance: 130816,
+    institution: 'HDFC Bank',
+    color: '#0d9488',
+  },
 ];
 
 // --- Real transactions (none yet) ---------------------------------------
