@@ -159,13 +159,14 @@ export function Reports() {
     boxShadow: 'var(--shadow-md)',
   };
 
-  const exportReport = () => {
+  const exportReport = async () => {
     const inRange = state.transactions.filter((t) => months.includes(t.date.slice(0, 7)));
-    downloadCSV(
+    const outcome = await downloadCSV(
       transactionsToCSV(inRange, state.accounts, state.categories),
       `report-${months[0]}-to-${months[months.length - 1]}.csv`
     );
-    toast(`Exported ${inRange.length} transactions`);
+    if (outcome === 'saved') toast(`Exported ${inRange.length} transactions`);
+    else if (outcome === 'failed') toast("Couldn't save the file", { tone: 'error' });
   };
 
   return (

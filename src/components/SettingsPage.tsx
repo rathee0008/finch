@@ -164,21 +164,23 @@ export function SettingsPage() {
         <div className="flex flex-wrap gap-2">
           <Button
             variant="secondary"
-            onClick={() => {
-              exportFullBackup(state);
-              toast('Backup downloaded');
+            onClick={async () => {
+              const outcome = await exportFullBackup(state);
+              if (outcome === 'saved') toast('Backup downloaded');
+              else if (outcome === 'failed') toast("Couldn't save the backup", { tone: 'error' });
             }}
           >
             <Download size={15} /> Export backup
           </Button>
           <Button
             variant="secondary"
-            onClick={() => {
-              downloadCSV(
+            onClick={async () => {
+              const outcome = await downloadCSV(
                 transactionsToCSV(state.transactions, state.accounts, state.categories),
                 `all-transactions-${new Date().toISOString().slice(0, 10)}.csv`
               );
-              toast('Transactions exported');
+              if (outcome === 'saved') toast('Transactions exported');
+              else if (outcome === 'failed') toast("Couldn't save the file", { tone: 'error' });
             }}
           >
             <Download size={15} /> Export all as CSV

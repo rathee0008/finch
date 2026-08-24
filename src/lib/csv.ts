@@ -35,24 +35,86 @@ export function transactionsToCSV(
     .join('\n');
 }
 
-export function downloadFile(content: string, filename: string, mime: string): void {
-  const blob = new Blob([content], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+export type SaveOutcome = 'saved' | 'declined' | 'failed';
+
+interface DownloadsNamespace {
+  save(request: { filename: string; data: string }): Promise<{ status: string }>;
 }
 
-export function downloadCSV(csv: string, filename: string): void {
-  downloadFile(csv, filename, 'text/csv;charset=utf-8;');
+/** The claude.ai artifact host exposes capabilities behind `claude.use(name)`. */
+async function getHostDownloads(): Promise<DownloadsNamespace | null> {
+  const host = (window as unknown as { claude?: { use?: (n: string) => Promise<unknown> } }).claude;
+  if (!host?.use) return null;
+  try {
+    return ((await host.use('downloads')) as DownloadsNamespace | null) ?? null;
+  } catch {
+    return null;
+  }
 }
 
-export function exportFullBackup(data: unknown): void {
-  downloadFile(
+function errorCode(err: unknown): string {
+  return typeof err === 'object' && err !== null && 'code' in err
+    ? String((err as { code: unknown }).code)
+    : 'unknown';
+}
+
+/**
+ * Hands a generated file to the user.
+ *
+ * In a normal browser this is an anchor download. Inside a claude.ai artifact
+ * the viewer sandbox makes anchor downloads inert, so route through the host's
+ * `downloads` capability instead, which shows the viewer a confirmation.
+ */
+export async function downloadFile(
+  content: string,
+  filename: string,
+  mime: string
+): Promise<SaveOutcome> {
+  const downloads = await getHostDownloads();
+
+  if (downloads) {
+    try {
+      await downloads.save({ filename, data: content });
+      return 'saved';
+    } catch (err) {
+      const code = errorCode(err);
+      if (code === 'declined') return 'declined';
+      // `.csv` sits in the host's extended extension set and isn't always
+      // enabled. The bytes are plain text either way, so retry as `.txt`.
+      if (code === 'extension_not_enabled' && filename.endsWith('.csv')) {
+        try {
+          await downloads.save({ filename: filename.replace(/\.csv$/, '.txt'), data: content });
+          return 'saved';
+        } catch (retryErr) {
+          return errorCode(retryErr) === 'declined' ? 'declined' : 'failed';
+        }
+      }
+      return 'failed';
+    }
+  }
+
+  try {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    return 'saved';
+  } catch {
+    return 'failed';
+  }
+}
+
+export function downloadCSV(csv: string, filename: string): Promise<SaveOutcome> {
+  return downloadFile(csv, filename, 'text/csv;charset=utf-8;');
+}
+
+export function exportFullBackup(data: unknown): Promise<SaveOutcome> {
+  return downloadFile(
     JSON.stringify(data, null, 2),
     `finance-backup-${new Date().toISOString().slice(0, 10)}.json`,
     'application/json'

@@ -163,12 +163,13 @@ export function Transactions() {
     setSearch('');
   };
 
-  const handleExport = () => {
-    downloadCSV(
+  const handleExport = async () => {
+    const outcome = await downloadCSV(
       transactionsToCSV(filtered, state.accounts, state.categories),
       `transactions-${new Date().toISOString().slice(0, 10)}.csv`
     );
-    toast(`Exported ${filtered.length} transactions`);
+    if (outcome === 'saved') toast(`Exported ${filtered.length} transactions`);
+    else if (outcome === 'failed') toast("Couldn't save the file", { tone: 'error' });
   };
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {

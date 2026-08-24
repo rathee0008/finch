@@ -24,14 +24,27 @@ import { formatCurrency, formatDate } from './lib/format';
 
 function useDarkMode() {
   const [isDark, setIsDark] = useState(() => {
-    const stored = localStorage.getItem('finance-app-theme');
-    if (stored) return stored === 'dark';
+    // An explicit in-app choice wins, then any theme stamped on the document
+    // by an embedding host, then the OS preference. localStorage can throw in
+    // sandboxed frames, so never let it take the app down on startup.
+    try {
+      const stored = localStorage.getItem('finance-app-theme');
+      if (stored) return stored === 'dark';
+    } catch {
+      /* storage unavailable — fall through to the host and OS preference */
+    }
+    const hostTheme = document.documentElement.dataset.theme;
+    if (hostTheme === 'dark' || hostTheme === 'light') return hostTheme === 'dark';
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDark);
-    localStorage.setItem('finance-app-theme', isDark ? 'dark' : 'light');
+    try {
+      localStorage.setItem('finance-app-theme', isDark ? 'dark' : 'light');
+    } catch {
+      /* preference simply won't persist */
+    }
   }, [isDark]);
 
   return { isDark, toggle: useCallback(() => setIsDark((d) => !d), []) };
@@ -75,9 +88,13 @@ function AppShell() {
 
   const [page, setPage] = useState<Page>('dashboard');
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(
-    () => localStorage.getItem('finance-app-sidebar') === 'collapsed'
-  );
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('finance-app-sidebar') === 'collapsed';
+    } catch {
+      return false;
+    }
+  });
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
@@ -92,7 +109,11 @@ function AppShell() {
   }, [state.settings.density]);
 
   useEffect(() => {
-    localStorage.setItem('finance-app-sidebar', collapsed ? 'collapsed' : 'expanded');
+    try {
+      localStorage.setItem('finance-app-sidebar', collapsed ? 'collapsed' : 'expanded');
+    } catch {
+      /* preference simply won't persist */
+    }
   }, [collapsed]);
 
   const toggleCollapsed = useCallback(() => setCollapsed((c) => !c), []);
