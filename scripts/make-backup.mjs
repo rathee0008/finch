@@ -53,6 +53,13 @@ const ACCOUNTS = [
     balance: 84252.93,
     color: '#f59e0b',
   },
+  {
+    name: 'Ritu HDFC',
+    type: 'savings',
+    balance: 32552,
+    institution: 'HDFC Bank',
+    color: '#db2777',
+  },
 ];
 
 // --- Real transactions (none yet) ---------------------------------------
