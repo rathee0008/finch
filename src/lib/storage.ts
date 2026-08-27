@@ -3,6 +3,7 @@ import { buildSampleState } from './sampleData';
 import { DEFAULT_SETTINGS } from './defaults';
 
 const STORAGE_KEY = 'finance-app-state-v1';
+const PROBE_KEY = 'finance-app-storage-probe';
 
 export { DEFAULT_SETTINGS };
 
@@ -35,11 +36,39 @@ export function loadState(): FinanceState {
   }
 }
 
-export function saveState(state: FinanceState): void {
+/**
+ * Writes state to localStorage and reports whether it actually landed.
+ *
+ * Some browser contexts — Safari Private Browsing chief among them — let
+ * `setItem` throw (or silently no-op) while every in-memory React update
+ * keeps working, so the UI looks correct until the next reload wipes it.
+ * That used to fail silently here; callers now get a real answer so they
+ * can warn the user instead of losing data without a trace.
+ */
+export function saveState(state: FinanceState): boolean {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return true;
   } catch {
-    // storage full or unavailable; the app keeps working in memory
+    return false;
+  }
+}
+
+/**
+ * Round-trips a small probe value through localStorage. Catches every variant
+ * of "storage looks present but doesn't actually persist" — quota errors,
+ * Private Browsing throwing on write, and the rarer case where a write
+ * succeeds but silently reads back as something else.
+ */
+export function checkStoragePersistence(): boolean {
+  const probeValue = String(Date.now());
+  try {
+    localStorage.setItem(PROBE_KEY, probeValue);
+    const readBack = localStorage.getItem(PROBE_KEY);
+    localStorage.removeItem(PROBE_KEY);
+    return readBack === probeValue;
+  } catch {
+    return false;
   }
 }
 
@@ -57,5 +86,9 @@ export function emptyState(): FinanceState {
 }
 
 export function clearState(): void {
-  localStorage.removeItem(STORAGE_KEY);
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* nothing to clean up if storage was never writable */
+  }
 }

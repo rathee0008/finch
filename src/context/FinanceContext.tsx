@@ -28,6 +28,9 @@ interface History {
 interface FinanceContextValue {
   state: FinanceState;
 
+  /** False when the most recent write to localStorage did not actually persist. */
+  persistenceOk: boolean;
+
   canUndo: boolean;
   canRedo: boolean;
   undo: () => void;
@@ -120,8 +123,15 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const state = history.present;
 
+  // Tracks whether the *last* write to localStorage actually landed. Some
+  // browser contexts — Safari Private Browsing chief among them — let
+  // setItem throw or silently no-op while every in-memory update keeps
+  // working, so the UI looks correct right up until the next reload wipes
+  // it. This used to fail without a trace; now the app can say so.
+  const [persistenceOk, setPersistenceOk] = useState(true);
+
   useEffect(() => {
-    saveState(state);
+    setPersistenceOk(saveState(state));
   }, [state]);
 
   // Snapshot on a trailing debounce so a burst of edits costs one entry, not
@@ -543,6 +553,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<FinanceContextValue>(
     () => ({
       state,
+      persistenceOk,
       canUndo: history.past.length > 0,
       canRedo: history.future.length > 0,
       undo,
@@ -585,6 +596,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       state,
+      persistenceOk,
       history.past.length,
       history.future.length,
       undo,

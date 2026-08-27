@@ -18,6 +18,7 @@ import { SettingsPage } from './components/SettingsPage';
 import { TransactionModal } from './components/TransactionModal';
 import { CommandPalette, type Command } from './components/CommandPalette';
 import { ShortcutsModal } from './components/ShortcutsModal';
+import { StorageWarningBanner } from './components/StorageWarningBanner';
 import { ALL_NAV_ITEMS, type Page } from './nav';
 import { exportFullBackup } from './lib/csv';
 import { formatCurrency, formatDate } from './lib/format';
@@ -327,6 +328,7 @@ function AppShell() {
       )}
 
       <div className="flex-1 min-w-0">
+        <StorageWarningBanner />
         <header
           className="md:hidden flex items-center gap-3 px-4 h-14 border-b sticky top-0 z-20"
           style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
