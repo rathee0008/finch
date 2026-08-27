@@ -13,6 +13,7 @@ import {
   Circle,
   ArrowLeftRight,
   SlidersHorizontal,
+  Paperclip,
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { useToast } from '../context/ToastContext';
@@ -548,6 +549,9 @@ export function Transactions() {
                       <td className="px-4 py-3 font-medium" style={{ color: 'var(--color-text)' }}>
                         <span className="flex items-center gap-1.5 flex-wrap">
                           {t.payee}
+                          {t.attachmentId && (
+                            <Paperclip size={11} style={{ color: 'var(--color-text-subtle)' }} />
+                          )}
                           {(t.tags ?? []).map((tag) => (
                             <span
                               key={tag}

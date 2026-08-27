@@ -20,6 +20,7 @@ import { CommandPalette, type Command } from './components/CommandPalette';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { StorageWarningBanner } from './components/StorageWarningBanner';
 import { consumeRestoreFlag } from './lib/urlRestore';
+import { checkAndNotifyDueBills } from './lib/notifications';
 import { ALL_NAV_ITEMS, type Page } from './nav';
 import { exportFullBackup } from './lib/csv';
 import { formatCurrency, formatDate } from './lib/format';
@@ -109,6 +110,17 @@ function AppShell() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Due-bill reminders: checked on load, then every 30 minutes for as long
+  // as the tab stays open. checkAndNotifyDueBills dedupes per bill per day
+  // on its own, so a re-render here never re-fires the same notification.
+  useEffect(() => {
+    if (!state.settings.remindersEnabled) return;
+    const run = () => checkAndNotifyDueBills(state.recurring, state.settings.currency);
+    run();
+    const interval = window.setInterval(run, 30 * 60 * 1000);
+    return () => window.clearInterval(interval);
+  }, [state.settings.remindersEnabled, state.recurring, state.settings.currency]);
 
   // Accent + density are driven by settings, applied to the document root.
   useEffect(() => {

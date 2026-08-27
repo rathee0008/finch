@@ -9,6 +9,7 @@ import {
   Banknote,
   TrendingUp,
   Landmark,
+  Users,
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { useToast } from '../context/ToastContext';
@@ -51,7 +52,7 @@ function AccountModal({
   onClose: () => void;
   editing?: Account;
 }) {
-  const { addAccount, updateAccount, deleteAccount } = useFinance();
+  const { state, addAccount, updateAccount, deleteAccount } = useFinance();
   const { toast } = useToast();
 
   const [name, setName] = useState('');
@@ -61,6 +62,12 @@ function AccountModal({
   const [institution, setInstitution] = useState('');
   const [apr, setApr] = useState('');
   const [minPayment, setMinPayment] = useState('');
+  const [owner, setOwner] = useState('');
+
+  const knownOwners = useMemo(
+    () => Array.from(new Set(state.accounts.map((a) => a.owner).filter(Boolean))) as string[],
+    [state.accounts]
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -71,6 +78,7 @@ function AccountModal({
     setInstitution(editing?.institution ?? '');
     setApr(editing?.apr != null ? String(editing.apr) : '');
     setMinPayment(editing?.minPayment != null ? String(editing.minPayment) : '');
+    setOwner(editing?.owner ?? '');
   }, [open, editing]);
 
   const submit = () => {
@@ -84,6 +92,7 @@ function AccountModal({
       institution: institution.trim() || undefined,
       apr: isDebtType(type) && apr ? parseFloat(apr) : undefined,
       minPayment: isDebtType(type) && minPayment ? parseFloat(minPayment) : undefined,
+      owner: owner.trim() || undefined,
     };
     if (editing) {
       updateAccount(editing.id, payload);
@@ -147,13 +156,28 @@ function AccountModal({
         </Field>
       </div>
 
-      <Field label="Institution (optional)">
-        <TextInput
-          value={institution}
-          onChange={(e) => setInstitution(e.target.value)}
-          placeholder="e.g. Chase"
-        />
-      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Institution (optional)">
+          <TextInput
+            value={institution}
+            onChange={(e) => setInstitution(e.target.value)}
+            placeholder="e.g. Chase"
+          />
+        </Field>
+        <Field label="Owner (optional)" hint="For a shared or family setup">
+          <TextInput
+            value={owner}
+            onChange={(e) => setOwner(e.target.value)}
+            placeholder="e.g. Papa"
+            list="account-owners"
+          />
+          <datalist id="account-owners">
+            {knownOwners.map((o) => (
+              <option key={o} value={o} />
+            ))}
+          </datalist>
+        </Field>
+      </div>
 
       {isDebtType(type) && (
         <div
@@ -207,6 +231,15 @@ export function Accounts() {
   const assets = active.filter((a) => a.balance >= 0);
   const debts = active.filter((a) => a.balance < 0);
 
+  const byOwner = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const a of active) {
+      if (!a.owner) continue;
+      map.set(a.owner, (map.get(a.owner) ?? 0) + a.balance);
+    }
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+  }, [active]);
+
   /** Reconstructs a short balance history per account for the sparklines. */
   const historyByAccount = useMemo(() => {
     const map = new Map<string, number[]>();
@@ -252,9 +285,10 @@ export function Accounts() {
         <div className="text-sm font-medium mb-0.5 flex items-center gap-1.5" style={{ color: 'var(--color-text)' }}>
           {a.name}
         </div>
-        <div className="text-xs mb-3 flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
+        <div className="text-xs mb-3 flex items-center gap-1.5 flex-wrap" style={{ color: 'var(--color-text-muted)' }}>
           {TYPE_LABELS[a.type]}
           {a.institution && <span>· {a.institution}</span>}
+          {a.owner && <Badge tone="accent">{a.owner}</Badge>}
           {a.apr != null && <Badge tone="warning">{a.apr}% APR</Badge>}
         </div>
         <div className="flex items-end justify-between gap-2">
@@ -309,6 +343,29 @@ export function Accounts() {
           </div>
         ))}
       </div>
+
+      {byOwner.length > 0 && (
+        <div className="card p-5">
+          <h2 className="text-sm font-semibold mb-3 flex items-center gap-1.5" style={{ color: 'var(--color-text)' }}>
+            <Users size={15} /> By person
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {byOwner.map(([person, total]) => (
+              <div key={person}>
+                <div className="text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>
+                  {person}
+                </div>
+                <div
+                  className="text-base font-semibold tnum"
+                  style={{ color: total < 0 ? 'var(--color-negative)' : 'var(--color-text)' }}
+                >
+                  {formatCurrency(total, currency)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {active.length === 0 ? (
         <EmptyState

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Plus, Trash2, SplitSquareHorizontal, X, Wand2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Plus, Trash2, SplitSquareHorizontal, X, Wand2, Paperclip, Image as ImageIcon } from 'lucide-react';
 import { Modal } from './ui/Modal';
 import { Field, TextInput, Select, Button, Segmented, Toggle, Badge } from './ui/Field';
 import { useFinance } from '../context/FinanceContext';
@@ -8,6 +8,13 @@ import type { Transaction, TransactionType, Split } from '../types';
 import { todayISO, formatCurrency } from '../lib/format';
 import { uid } from '../lib/id';
 import { findMatchingRule } from '../lib/rules';
+import {
+  attachmentsSupported,
+  deleteAttachment,
+  getAttachmentUrl,
+  saveAttachment,
+  validateAttachmentFile,
+} from '../lib/attachments';
 
 export function TransactionModal({
   open,
@@ -35,6 +42,15 @@ export function TransactionModal({
   const [splits, setSplits] = useState<Split[]>([]);
   const [splitMode, setSplitMode] = useState(false);
 
+  // Receipt attachment: existingAttachmentId is what's already saved (if
+  // editing); newAttachmentFile is a pending replacement not yet written to
+  // IndexedDB; removeAttachment marks the existing one for deletion on save.
+  const [existingAttachmentId, setExistingAttachmentId] = useState<string | undefined>(undefined);
+  const [newAttachmentFile, setNewAttachmentFile] = useState<File | null>(null);
+  const [removeAttachment, setRemoveAttachment] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (!open) return;
     if (editing) {
@@ -50,6 +66,7 @@ export function TransactionModal({
       setCleared(editing.cleared ?? true);
       setSplits(editing.splits ?? []);
       setSplitMode(Boolean(editing.splits?.length));
+      setExistingAttachmentId(editing.attachmentId);
     } else {
       setType('expense');
       setDate(todayISO());
@@ -63,9 +80,36 @@ export function TransactionModal({
       setCleared(true);
       setSplits([]);
       setSplitMode(false);
+      setExistingAttachmentId(undefined);
     }
+    setNewAttachmentFile(null);
+    setRemoveAttachment(false);
     setTagDraft('');
   }, [open, editing, state.accounts]);
+
+  // Loads a preview for whichever attachment is currently "active": a freshly
+  // chosen file takes priority, then the saved one, unless it was removed.
+  useEffect(() => {
+    if (newAttachmentFile) {
+      const url = URL.createObjectURL(newAttachmentFile);
+      setPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    }
+    if (existingAttachmentId && !removeAttachment) {
+      let cancelled = false;
+      let cleanup: (() => void) | undefined;
+      getAttachmentUrl(existingAttachmentId).then((result) => {
+        if (cancelled || !result) return;
+        setPreviewUrl(result.url);
+        cleanup = result.revoke;
+      });
+      return () => {
+        cancelled = true;
+        cleanup?.();
+      };
+    }
+    setPreviewUrl(null);
+  }, [newAttachmentFile, existingAttachmentId, removeAttachment]);
 
   const categories = state.categories.filter(
     (c) => c.type === (type === 'income' ? 'income' : 'expense') && !c.archived
@@ -101,7 +145,7 @@ export function TransactionModal({
     ]);
   };
 
-  const submit = () => {
+  const submit = async () => {
     const amt = parseFloat(amount);
     if (!amt || amt <= 0) return toast('Enter an amount greater than zero', { tone: 'error' });
     if (!accountId) return toast('Pick an account', { tone: 'error' });
@@ -120,6 +164,26 @@ export function TransactionModal({
       );
     }
 
+    // Resolve the receipt attachment: write a newly chosen file to
+    // IndexedDB, delete one the user removed, or leave the existing one
+    // alone. Done last so a validation error above never orphans a save.
+    let attachmentId = existingAttachmentId;
+    if (newAttachmentFile) {
+      attachmentId = uid();
+      try {
+        await saveAttachment(attachmentId, newAttachmentFile);
+      } catch {
+        toast("Couldn't save the receipt image — saving the transaction without it", { tone: 'warning' });
+        attachmentId = existingAttachmentId;
+      }
+      if (existingAttachmentId && existingAttachmentId !== attachmentId) {
+        deleteAttachment(existingAttachmentId).catch(() => {});
+      }
+    } else if (removeAttachment && existingAttachmentId) {
+      deleteAttachment(existingAttachmentId).catch(() => {});
+      attachmentId = undefined;
+    }
+
     const payload: Omit<Transaction, 'id'> = {
       date,
       accountId,
@@ -132,6 +196,7 @@ export function TransactionModal({
       tags: tags.length ? tags : undefined,
       cleared,
       splits: activeSplits.length ? activeSplits.map((s) => ({ ...s, amount: Number(s.amount) })) : undefined,
+      attachmentId,
     };
 
     if (editing) {
@@ -157,6 +222,7 @@ export function TransactionModal({
               variant="danger"
               onClick={() => {
                 deleteTransaction(editing.id);
+                if (editing.attachmentId) deleteAttachment(editing.attachmentId).catch(() => {});
                 toast('Transaction deleted');
                 onClose();
               }}
@@ -397,6 +463,55 @@ export function TransactionModal({
           placeholder="Optional note"
         />
       </Field>
+
+      {attachmentsSupported() && (
+        <Field label="Receipt">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (!file) return;
+              const error = validateAttachmentFile(file);
+              if (error) return toast(error, { tone: 'error' });
+              setNewAttachmentFile(file);
+              setRemoveAttachment(false);
+            }}
+          />
+          {previewUrl ? (
+            <div className="flex items-center gap-3">
+              <img
+                src={previewUrl}
+                alt="Receipt"
+                className="w-16 h-16 rounded-lg object-cover shrink-0"
+                style={{ border: '1px solid var(--color-border)' }}
+              />
+              <div className="flex gap-2">
+                <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
+                  <Paperclip size={13} /> Replace
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setNewAttachmentFile(null);
+                    setRemoveAttachment(true);
+                  }}
+                >
+                  <X size={13} /> Remove
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
+              <ImageIcon size={14} /> Attach a photo
+            </Button>
+          )}
+        </Field>
+      )}
 
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>

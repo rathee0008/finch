@@ -1,13 +1,18 @@
 import { useRef, useState } from 'react';
-import { Download, Upload, RotateCcw, Trash2, Check, History, Undo2 } from 'lucide-react';
+import { Download, Upload, RotateCcw, Trash2, Check, History, Undo2, Bell, BellOff } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { useToast } from '../context/ToastContext';
 import { exportFullBackup, transactionsToCSV, downloadCSV } from '../lib/csv';
 import { ACCENT_PRESETS, CURRENCIES } from '../lib/defaults';
 import { listSnapshots, REASON_LABELS } from '../lib/snapshots';
 import { formatCurrency } from '../lib/format';
+import {
+  notificationPermission,
+  notificationsSupported,
+  requestNotificationPermission,
+} from '../lib/notifications';
 import { Modal } from './ui/Modal';
-import { Button, Field, Select, Segmented, TextInput, Badge } from './ui/Field';
+import { Button, Field, Select, Segmented, TextInput, Badge, Toggle } from './ui/Field';
 import type { Density } from '../types';
 
 function Section({
@@ -48,6 +53,29 @@ export function SettingsPage() {
   const { settings } = state;
   // Re-read on each render so the list reflects snapshots taken since mount.
   const snapshots = listSnapshots();
+  const permission = notificationPermission();
+
+  const handleToggleReminders = async (enabled: boolean) => {
+    if (!enabled) {
+      updateSettings({ remindersEnabled: false });
+      return;
+    }
+    if (!notificationsSupported()) {
+      toast('This browser does not support notifications', { tone: 'error' });
+      return;
+    }
+    if (permission === 'denied') {
+      toast('Notifications are blocked for this site in your browser settings', { tone: 'error' });
+      return;
+    }
+    const result = await requestNotificationPermission();
+    if (result === 'granted') {
+      updateSettings({ remindersEnabled: true });
+      toast('Reminders on — due bills will notify you while Finch is open');
+    } else {
+      toast('Permission not granted, so reminders stayed off', { tone: 'info' });
+    }
+  };
 
   const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -147,6 +175,32 @@ export function SettingsPage() {
               <option value="180">180 days</option>
             </Select>
           </Field>
+        </div>
+      </Section>
+
+      <Section
+        title="Reminders"
+        description="A notification when a bill is due or overdue — only while Finch is open in a tab (or installed) on this device. There's no server behind this app to notify you when it's closed."
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            {settings.remindersEnabled ? (
+              <Bell size={17} style={{ color: 'var(--color-accent)' }} />
+            ) : (
+              <BellOff size={17} style={{ color: 'var(--color-text-muted)' }} />
+            )}
+            <div>
+              <div className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>
+                Due-bill notifications
+              </div>
+              {permission === 'denied' && (
+                <div className="text-xs" style={{ color: 'var(--color-negative)' }}>
+                  Blocked in browser settings for this site
+                </div>
+              )}
+            </div>
+          </div>
+          <Toggle checked={Boolean(settings.remindersEnabled)} onChange={handleToggleReminders} />
         </div>
       </Section>
 

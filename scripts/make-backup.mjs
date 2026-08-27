@@ -21,6 +21,7 @@ const ACCOUNTS = [
     balance: 1000000,
     institution: 'HDFC Bank',
     color: '#059669',
+    owner: 'Papa',
   },
   {
     name: 'Saurabh HDFC',
@@ -28,6 +29,7 @@ const ACCOUNTS = [
     balance: 12615,
     institution: 'HDFC Bank',
     color: '#4f46e5',
+    owner: 'Saurabh',
   },
   {
     // Current value of 26 HDFC Bank + 50 ITC shares, per the Groww app.
@@ -36,6 +38,7 @@ const ACCOUNTS = [
     balance: 32439.0,
     institution: 'Groww',
     color: '#0891b2',
+    owner: 'Saurabh',
   },
   {
     // Current value of all 6 SIP/mutual fund holdings (only 3 were visible
@@ -45,6 +48,7 @@ const ACCOUNTS = [
     balance: 34599.0,
     institution: 'Groww',
     color: '#2563eb',
+    owner: 'Saurabh',
   },
   {
     // Current value of the fractional US stock portfolio (Alphabet, TSM, etc).
@@ -52,6 +56,7 @@ const ACCOUNTS = [
     type: 'investment',
     balance: 84252.93,
     color: '#f59e0b',
+    owner: 'Saurabh',
   },
   {
     name: 'Ritu HDFC',
@@ -59,9 +64,11 @@ const ACCOUNTS = [
     balance: 32552,
     institution: 'HDFC Bank',
     color: '#db2777',
+    owner: 'Ritu',
   },
   {
     name: 'Asha HDFC',
+    owner: 'Asha',
     type: 'savings',
     balance: 130816,
     institution: 'HDFC Bank',
@@ -238,6 +245,7 @@ const accounts = ACCOUNTS.map((a) => ({
   ...(a.institution ? { institution: a.institution } : {}),
   ...(a.apr != null ? { apr: a.apr } : {}),
   ...(a.minPayment != null ? { minPayment: a.minPayment } : {}),
+  ...(a.owner ? { owner: a.owner } : {}),
 }));
 const accountByName = new Map(accounts.map((a) => [a.name.toLowerCase(), a.id]));
 

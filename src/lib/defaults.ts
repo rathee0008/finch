@@ -7,6 +7,7 @@ export const DEFAULT_SETTINGS: Settings = {
   accent: '#4f46e5',
   density: 'comfortable',
   forecastDays: 90,
+  remindersEnabled: false,
 };
 
 export interface AccentPreset {

@@ -13,6 +13,8 @@ export interface Account {
   /** Monthly minimum payment for credit/loan accounts. */
   minPayment?: number;
   institution?: string;
+  /** Whose account this is, for a shared/family setup — e.g. "Papa", "Ritu". */
+  owner?: string;
 }
 
 export type TransactionType = 'income' | 'expense' | 'transfer';
@@ -37,6 +39,8 @@ export interface Transaction {
   cleared?: boolean;
   /** When present, this transaction is split across several categories. */
   splits?: Split[];
+  /** Id of a receipt/photo stored in IndexedDB via lib/attachments.ts. */
+  attachmentId?: string;
 }
 
 export interface Category {
@@ -108,6 +112,8 @@ export interface Settings {
   density: Density;
   /** Days ahead the cash-flow forecast projects. */
   forecastDays: number;
+  /** Whether to request browser notification permission for due bills. */
+  remindersEnabled?: boolean;
 }
 
 export interface FinanceState {
