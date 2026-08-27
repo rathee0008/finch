@@ -19,6 +19,7 @@ import { TransactionModal } from './components/TransactionModal';
 import { CommandPalette, type Command } from './components/CommandPalette';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { StorageWarningBanner } from './components/StorageWarningBanner';
+import { consumeRestoreFlag } from './lib/urlRestore';
 import { ALL_NAV_ITEMS, type Page } from './nav';
 import { exportFullBackup } from './lib/csv';
 import { formatCurrency, formatDate } from './lib/format';
@@ -99,6 +100,15 @@ function AppShell() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+
+  // If this load just restored data from a #restore=... link, say so —
+  // otherwise a one-tap restore is invisible and easy to doubt happened.
+  useEffect(() => {
+    if (consumeRestoreFlag()) {
+      toast(`Your data was loaded — ${state.accounts.length} accounts restored`, { duration: 5000 });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Accent + density are driven by settings, applied to the document root.
   useEffect(() => {
