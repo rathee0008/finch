@@ -140,6 +140,43 @@ const RECURRING = [
   },
 ];
 
+// --- Monthly budgets -------------------------------------------------------
+// Placeholder limits for a middle-class Indian household — adjust every one
+// of these in the app once you know your actual spending in each category.
+// The home loan EMIs aren't budgeted here since they're fixed, already-known
+// recurring items, not discretionary spend to cap.
+const BUDGETS = [
+  { category: 'Groceries', amount: 10000 },
+  { category: 'Utilities', amount: 2500 },
+  { category: 'Dining Out', amount: 3000 },
+  { category: 'Transport', amount: 2500 },
+  { category: 'Fuel', amount: 3000 },
+  { category: 'Shopping', amount: 5000 },
+  { category: 'Entertainment', amount: 1500 },
+  { category: 'Subscriptions', amount: 4500 },
+  { category: 'Family', amount: 5000 },
+  { category: 'Other', amount: 2000 },
+];
+
+// --- Savings goals -----------------------------------------------------
+// Placeholder targets — rename, retarget or delete in the app.
+const GOALS = [
+  { name: 'Emergency Fund', targetAmount: 300000, currentAmount: 0, icon: '🛟', color: '#059669' },
+  { name: 'Family Vacation', targetAmount: 100000, currentAmount: 0, icon: '✈️', color: '#0891b2' },
+];
+
+// --- Auto-categorization rules -------------------------------------------
+// Files future transactions from these exact payees under the right category
+// automatically — useful once you start entering day-to-day spending too.
+const RULES = [
+  { pattern: 'Home Loan EMI', matchType: 'exact', category: 'Home Loan EMI' },
+  { pattern: 'WiFi', matchType: 'exact', category: 'Utilities' },
+  { pattern: 'YouTube', matchType: 'exact', category: 'Subscriptions' },
+  { pattern: 'Anthropic AI', matchType: 'exact', category: 'Subscriptions' },
+  { pattern: 'Library', matchType: 'exact', category: 'Subscriptions' },
+  { pattern: 'Instagram', matchType: 'exact', category: 'Subscriptions' },
+];
+
 // A practical starting category set. These are just defaults — rename, recolor
 // or delete any of them in the app.
 const CATEGORIES = [
@@ -172,6 +209,10 @@ function pad2(n) {
 }
 function toLocalISODate(d) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+function currentMonth() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
 }
 
 /** Next calendar date (today or later) that falls on the given day-of-month. */
@@ -235,14 +276,51 @@ if (missingRecurring.length) {
   throw new Error(`These recurring items reference an unknown account: ${JSON.stringify(missingRecurring)}`);
 }
 
+const thisMonth = currentMonth();
+const budgets = BUDGETS.map((b) => ({
+  id: randomUUID(),
+  categoryId: categoryByName.get(b.category.toLowerCase()),
+  amount: b.amount,
+  month: thisMonth,
+}));
+
+const missingBudgets = budgets.filter((b) => !b.categoryId);
+if (missingBudgets.length) {
+  throw new Error(`These budgets reference an unknown category: ${JSON.stringify(missingBudgets)}`);
+}
+
+const goals = GOALS.map((g) => ({
+  id: randomUUID(),
+  name: g.name,
+  targetAmount: g.targetAmount,
+  currentAmount: g.currentAmount,
+  icon: g.icon,
+  color: g.color,
+  ...(g.targetDate ? { targetDate: g.targetDate } : {}),
+  ...(g.monthlyContribution != null ? { monthlyContribution: g.monthlyContribution } : {}),
+}));
+
+const rules = RULES.map((r) => ({
+  id: randomUUID(),
+  pattern: r.pattern,
+  matchType: r.matchType,
+  categoryId: r.category ? categoryByName.get(r.category.toLowerCase()) : undefined,
+  enabled: true,
+}));
+
+const missingRules = rules.filter((r) => !r.categoryId);
+if (missingRules.length) {
+  throw new Error(`These rules reference an unknown category: ${JSON.stringify(missingRules)}`);
+}
+
 const state = {
   accounts,
   transactions,
   categories,
-  budgets: [],
+  budgets,
   recurring,
-  goals: [],
-  rules: [],
+  goals,
+  rules,
   settings: {
     currency: CURRENCY,
     theme: 'system',
@@ -260,8 +338,15 @@ writeFileSync(out, JSON.stringify(state, null, 2), 'utf8');
 const total = accounts.reduce((s, a) => s + a.balance, 0);
 const fmt = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: CURRENCY }).format(n);
 console.log(`Wrote ${out}`);
-console.log(`  ${accounts.length} account(s), ${transactions.length} transaction(s), ${categories.length} categories, ${recurring.length} recurring item(s)`);
+console.log(
+  `  ${accounts.length} account(s), ${transactions.length} transaction(s), ${categories.length} categories, ${recurring.length} recurring item(s), ${budgets.length} budget(s), ${goals.length} goal(s), ${rules.length} rule(s)`
+);
 console.log(`  net worth: ${fmt(total)}`);
 for (const r of recurring) {
   console.log(`  recurring: ${r.name} ${fmt(r.amount)} ${r.freq}, next ${r.nextDate}`);
+}
+const budgetTotal = budgets.reduce((s, b) => s + b.amount, 0);
+console.log(`  budgets total: ${fmt(budgetTotal)}/month across ${budgets.length} categories`);
+for (const g of goals) {
+  console.log(`  goal: ${g.name} target ${fmt(g.targetAmount)}`);
 }
