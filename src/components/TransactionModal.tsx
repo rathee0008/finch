@@ -299,7 +299,10 @@ export function TransactionModal({
         </Field>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      {/* Account/category names run longer than amounts or dates, so this
+          row stacks on narrow screens instead of squeezing two selects
+          into ~145px each, where longer account names were truncating. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label={type === 'transfer' ? 'From account' : 'Account'}>
           <Select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
             {state.accounts.map((a) => (

@@ -481,7 +481,129 @@ export function Transactions() {
         />
       ) : (
         <div className="card overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Mobile: a stacked card per transaction, amount always visible.
+              The table below hides the amount off-screen on narrow viewports
+              (behind a silent horizontal scroll), which is the wrong default
+              for the number a finance app is opened to check. */}
+          <div className="sm:hidden divide-y" style={{ borderColor: 'var(--color-border)' }}>
+            {visible.map((t) => {
+              const cat = state.categories.find((c) => c.id === t.categoryId);
+              const acct = state.accounts.find((a) => a.id === t.accountId);
+              const toAcct = state.accounts.find((a) => a.id === t.toAccountId);
+              const isSelected = selected.has(t.id);
+              const splitCats = (t.splits ?? [])
+                .map((s) => state.categories.find((c) => c.id === s.categoryId))
+                .filter(Boolean);
+
+              return (
+                <div
+                  key={t.id}
+                  className="flex items-start gap-3 p-4"
+                  style={{ background: isSelected ? 'var(--color-accent-soft)' : 'transparent' }}
+                  onClick={() => {
+                    setEditing(t);
+                    setModalOpen(true);
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelect(t.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="cursor-pointer accent-[var(--color-accent)] mt-1 shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div
+                          className="font-medium flex items-center gap-1.5 flex-wrap"
+                          style={{ color: 'var(--color-text)' }}
+                        >
+                          {t.payee}
+                          {t.attachmentId && (
+                            <Paperclip size={11} style={{ color: 'var(--color-text-subtle)' }} />
+                          )}
+                        </div>
+                        <div
+                          className="text-xs mt-0.5 flex items-center gap-1"
+                          style={{ color: 'var(--color-text-muted)' }}
+                        >
+                          {t.cleared === false ? (
+                            <Circle size={10} style={{ color: 'var(--color-warning)' }} />
+                          ) : (
+                            <CheckCircle2 size={10} style={{ color: 'var(--color-positive)' }} />
+                          )}
+                          {formatDate(t.date)}
+                        </div>
+                      </div>
+                      <span
+                        className="text-base font-semibold tnum whitespace-nowrap shrink-0"
+                        style={{
+                          color:
+                            t.type === 'income'
+                              ? 'var(--color-positive)'
+                              : t.type === 'expense'
+                              ? 'var(--color-text)'
+                              : 'var(--color-text-muted)',
+                        }}
+                      >
+                        {t.type === 'income' ? '+' : t.type === 'expense' ? '−' : ''}
+                        {formatCurrency(t.amount, currency)}
+                      </span>
+                    </div>
+
+                    <div
+                      className="text-xs mt-1.5 flex items-center gap-1.5 flex-wrap"
+                      style={{ color: 'var(--color-text-muted)' }}
+                    >
+                      {t.type === 'transfer' ? (
+                        <span className="flex items-center gap-1">
+                          <ArrowLeftRight size={11} /> Transfer
+                        </span>
+                      ) : splitCats.length > 0 ? (
+                        <>
+                          <Badge tone="accent">split</Badge>
+                          <span>{splitCats.map((c) => c!.name).join(', ')}</span>
+                        </>
+                      ) : cat ? (
+                        <span>
+                          {cat.icon} {cat.name}
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--color-text-subtle)' }}>Uncategorized</span>
+                      )}
+                      <span>·</span>
+                      <span className="truncate">
+                        {acct?.name ?? '—'}
+                        {toAcct && ` → ${toAcct.name}`}
+                      </span>
+                    </div>
+
+                    {(t.tags?.length || t.notes) && (
+                      <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                        {(t.tags ?? []).map((tag) => (
+                          <span
+                            key={tag}
+                            className="text-[10px] px-1.5 py-0.5 rounded"
+                            style={{ background: 'var(--color-accent-soft)', color: 'var(--color-accent)' }}
+                          >
+                            #{tag}
+                          </span>
+                        ))}
+                        {t.notes && (
+                          <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                            {t.notes}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b" style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-2)' }}>

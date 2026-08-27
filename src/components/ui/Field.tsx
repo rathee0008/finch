@@ -32,7 +32,13 @@ export function TextInput({
   className = '',
   ...props
 }: React.InputHTMLAttributes<HTMLInputElement> & { ref?: React.Ref<HTMLInputElement> }) {
-  return <input {...props} className={`input ${className}`} />;
+  // type="number" alone still surfaces a full QWERTY keyboard (with a
+  // numeric row bolted on) on plenty of Android keyboards. inputMode
+  // "decimal" is what actually requests the calculator-style numeric pad —
+  // set it here once so every amount field in the app gets it for free,
+  // this one included, unless a caller explicitly asks for something else.
+  const inputMode = props.inputMode ?? (props.type === 'number' ? 'decimal' : undefined);
+  return <input {...props} inputMode={inputMode} className={`input ${className}`} />;
 }
 
 export function TextArea({ className = '', ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
